@@ -95,8 +95,9 @@ if __name__ == "__main__":
                 for kernel_size in kernel_sizes:
                     for dropout_rate in dropout_rates:
                         # log training info
-                        k += 1
+                        k+=1
                         if k > 1967 :
+
                             fi.writelines([
                                 "*********************************************************************************************************************************************\r",
                                 "model parameter set "+str(k)+"\r",
@@ -105,50 +106,50 @@ if __name__ == "__main__":
                                 "window step: "+str(window_step)+"\r",
                                 "\r"
                             ])  # "\n" is automatically append to the end of each line
-    
-                                # NN: 4-fold cross validation
-                                acc = []
-                                TPs = []
-                                FPs = []
-                                TNs = []
-                                FNs = []
-                                for i in range(4):
-                                    print(
-                                        "################################################################################################################################", end="\n")
-                                    print("fold "+str(i+1)+"/"+str(4), end="\n")
-                                    tmp_train_x = X_train.tolist()
-                                    tmp_train_y = Y_train.tolist()
-                                    start = i*len(X_train)//4
-                                    end = (i+1)*len(X_train)//4
-                                    del(tmp_train_x[start:end])
-                                    del(tmp_train_y[start:end])
-                                    tmp_train_x = np.array(tmp_train_x)
-                                    tmp_train_y = np.array(tmp_train_y)
-                                    tmp_val_x = X_train[start:end]
-                                    tmp_val_y = Y_train[start:end]
-    
-                                    model = build_model(window_size, hidden_tensor, kernel_size, dropout_rate)
-                                    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[F1Score(num_classes=2)])
-                                    print(model.summary())
-                                    model.fit(tmp_train_x, tmp_train_y, validation_data=(tmp_val_x, tmp_val_y), epochs=n_epoch, batch_size=n_batch)
-    
-                                    scores = model.evaluate(X_test, Y_test, batch_size=n_batch, verbose=0)
-                                    Y_predict = model.predict(X_test,batch_size=n_batch)
-                                    Mat = perf_measure(Y_test, Y_predict)
-                                    acc.append(scores[1][0])
-    
-                                    sys.stdout = oldStdOut
-                                    print("Model f1 score: %.3f" % (scores[1][0]*100))
-                                    print(Mat)
-                                    print()
-                                    sys.stdout = fiout
-                                    print("Model f1 score: %.3f" % (scores[1][0]*100))
-                                    print("(TP, FP, TN, FN)"+str(Mat))
-                                    model.save(os.path.join("model", "classifier-"+str(n)+"-"+str(k)+"-"+str(i)+".h5"))
-                                    TPs.append(Mat[0])
-                                    FPs.append(Mat[1])
-                                    TNs.append(Mat[2])
-                                    FNs.append(Mat[3])
+
+                            # NN: 4-fold cross validation
+                            acc = []
+                            TPs = []
+                            FPs = []
+                            TNs = []
+                            FNs = []
+                            for i in range(4):
+                                print(
+                                    "################################################################################################################################", end="\n")
+                                print("fold "+str(i+1)+"/"+str(4), end="\n")
+                                tmp_train_x = X_train.tolist()
+                                tmp_train_y = Y_train.tolist()
+                                start = i*len(X_train)//4
+                                end = (i+1)*len(X_train)//4
+                                del(tmp_train_x[start:end])
+                                del(tmp_train_y[start:end])
+                                tmp_train_x = np.array(tmp_train_x)
+                                tmp_train_y = np.array(tmp_train_y)
+                                tmp_val_x = X_train[start:end]
+                                tmp_val_y = Y_train[start:end]
+
+                                model = build_model(window_size, hidden_tensor, kernel_size, dropout_rate)
+                                model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[F1Score(num_classes=2)])
+                                print(model.summary())
+                                model.fit(tmp_train_x, tmp_train_y, validation_data=(tmp_val_x, tmp_val_y), epochs=n_epoch, batch_size=n_batch)
+
+                                scores = model.evaluate(X_test, Y_test, batch_size=n_batch, verbose=0)
+                                Y_predict = model.predict(X_test,batch_size=n_batch)
+                                Mat = perf_measure(Y_test, Y_predict)
+                                acc.append(scores[1][0])
+
+                                sys.stdout = oldStdOut
+                                print("Model f1 score: %.3f" % (scores[1][0]*100))
+                                print(Mat)
+                                print()
+                                sys.stdout = fiout
+                                print("Model f1 score: %.3f" % (scores[1][0]*100))
+                                print("(TP, FP, TN, FN)"+str(Mat))
+                                model.save(os.path.join("model", "classifier-"+str(n)+"-"+str(k)+"-"+str(i)+".h5"))
+                                TPs.append(Mat[0])
+                                FPs.append(Mat[1])
+                                TNs.append(Mat[2])
+                                FNs.append(Mat[3])
 
                             print("######################################################################################################", end="\n")
                             print("all folds done", end="\n")
@@ -163,7 +164,6 @@ if __name__ == "__main__":
                             sys.stdout = oldStdOut
                             print("Completed %d/%s" % (k, 5*5*6*3*5))
                             sys.stdout = fiout
-                        
 
 sys.stdout = oldStdOut
 fi.close()
