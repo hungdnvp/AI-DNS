@@ -67,11 +67,11 @@ if __name__ == "__main__":
     n_batch = 50
 
     # parameters to tune
-    window_sizes = [4, 6, 8, 10, 12]
-    window_steps = [1, 2, 4, 6, 8]
-    hidden_tensors = [[64, 64, 16],[64,32,16],[32,32,16],[32, 32, 8], [32, 16, 8],[16,16,8]]
-    kernel_sizes = [[(2, 2), (2, 2)], [(3, 3), (3, 3)], [(4, 4), (4, 4)]]
-    dropout_rates = [0.05,0.1, 0.15, 0.2, 0.25]
+    window_size = 6
+    window_step = 1
+    hidden_tensor = [32,32,16]
+    kernel_size = [(2, 2), (2, 2)]
+    dropout_rate = [0.15]
 
     # load models
     n = 0
@@ -82,88 +82,77 @@ if __name__ == "__main__":
     fiout = fi
     oldStdOut = sys.stdout
     sys.stdout = fi
-    k = 0
-    for window_size in window_sizes:
-        for window_step in window_steps:
-            ss=k//90
-            sys.stdout = fiout
-            X_train=np.load(os.path.join("data","X_train-%.3d.npy"%ss),allow_pickle=True)
-            X_test=np.load(os.path.join("data","X_test-%.3d.npy"%ss),allow_pickle=True)
-            Y_train=np.load(os.path.join("data","Y_train-%.3d.npy"%ss),allow_pickle=True)
-            Y_test=np.load(os.path.join("data","Y_test-%.3d.npy"%ss),allow_pickle=True)
-            for hidden_tensor in hidden_tensors:
-                for kernel_size in kernel_sizes:
-                    for dropout_rate in dropout_rates:
-                        # log training info
-                        k+=1
-                        if k > 1967 :
+    sys.stdout = fiout
+    X_train=np.load("X_train.npy",allow_pickle=True)
+    X_test=np.load("X_test.npy",allow_pickle=True)
+    Y_train=np.load("Y_train.npy",allow_pickle=True)
+    Y_test=np.load("Y_test.npy",allow_pickle=True)
+    # log training info
+    fi.writelines([
+        "*********************************************************************************************************************************************\r",
+        "batch size: "+str(n_batch)+"\r",
+        "window size: "+str(window_size)+"\r",
+        "window step: "+str(window_step)+"\r",
+        "\r"
+    ])  # "\n" is automatically append to the end of each line
 
-                            fi.writelines([
-                                "*********************************************************************************************************************************************\r",
-                                "model parameter set "+str(k)+"\r",
-                                "batch size: "+str(n_batch)+"\r",
-                                "window size: "+str(window_size)+"\r",
-                                "window step: "+str(window_step)+"\r",
-                                "\r"
-                            ])  # "\n" is automatically append to the end of each line
+                        # NN: 4-fold cross validation
+    acc = []
+    TPs = []
+    FPs = []
+    TNs = []
+    FNs = []
+    for i in range(4):
+        print(
+            "################################################################################################################################", end="\n")
+        print("fold "+str(i+1)+"/"+str(4), end="\n")
+        tmp_train_x = X_train.tolist()
+        tmp_train_y = Y_train.tolist()
+        start = i*len(X_train)//4
+        end = (i+1)*len(X_train)//4
+        del(tmp_train_x[start:end])
+        del(tmp_train_y[start:end])
+        tmp_train_x = np.array(tmp_train_x)
+        tmp_train_y = np.array(tmp_train_y)
+        tmp_val_x = X_train[start:end]
+        tmp_val_y = Y_train[start:end]
 
-                            # NN: 4-fold cross validation
-                            acc = []
-                            TPs = []
-                            FPs = []
-                            TNs = []
-                            FNs = []
-                            for i in range(4):
-                                print(
-                                    "################################################################################################################################", end="\n")
-                                print("fold "+str(i+1)+"/"+str(4), end="\n")
-                                tmp_train_x = X_train.tolist()
-                                tmp_train_y = Y_train.tolist()
-                                start = i*len(X_train)//4
-                                end = (i+1)*len(X_train)//4
-                                del(tmp_train_x[start:end])
-                                del(tmp_train_y[start:end])
-                                tmp_train_x = np.array(tmp_train_x)
-                                tmp_train_y = np.array(tmp_train_y)
-                                tmp_val_x = X_train[start:end]
-                                tmp_val_y = Y_train[start:end]
+        model = build_model(window_size, hidden_tensor, kernel_size, dropout_rate)
+        model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[F1Score(num_classes=2)])
+        print(model.summary())
+        model.fit(tmp_train_x, tmp_train_y, validation_data=(tmp_val_x, tmp_val_y), epochs=n_epoch, batch_size=n_batch)
 
-                                model = build_model(window_size, hidden_tensor, kernel_size, dropout_rate)
-                                model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[F1Score(num_classes=2)])
-                                print(model.summary())
-                                model.fit(tmp_train_x, tmp_train_y, validation_data=(tmp_val_x, tmp_val_y), epochs=n_epoch, batch_size=n_batch)
+        scores = model.evaluate(X_test, Y_test, batch_size=n_batch, verbose=0)
+        Y_predict = model.predict(X_test,batch_size=n_batch)
+        Mat = perf_measure(Y_test, Y_predict)
+        acc.append(scores[1][0])
 
-                                scores = model.evaluate(X_test, Y_test, batch_size=n_batch, verbose=0)
-                                Y_predict = model.predict(X_test,batch_size=n_batch)
-                                Mat = perf_measure(Y_test, Y_predict)
-                                acc.append(scores[1][0])
+        sys.stdout = oldStdOut
+        print("Model f1 score: %.3f" % (scores[1][0]*100))
+        print(Mat)
+        print()
+        sys.stdout = fiout
+        print("Model f1 score: %.3f" % (scores[1][0]*100))
+        print("(TP, FP, TN, FN)"+str(Mat))
+        model.save(os.path.join("model", "classifier-"+str(n)+"-"+"-"+str(i)+".h5"))
+        TPs.append(Mat[0])
+        FPs.append(Mat[1])
+        TNs.append(Mat[2])
+        FNs.append(Mat[3])
 
-                                sys.stdout = oldStdOut
-                                print("Model f1 score: %.3f" % (scores[1][0]*100))
-                                print(Mat)
-                                print()
-                                sys.stdout = fiout
-                                print("Model f1 score: %.3f" % (scores[1][0]*100))
-                                print("(TP, FP, TN, FN)"+str(Mat))
-                                model.save(os.path.join("model", "classifier-"+str(n)+"-"+str(k)+"-"+str(i)+".h5"))
-                                TPs.append(Mat[0])
-                                FPs.append(Mat[1])
-                                TNs.append(Mat[2])
-                                FNs.append(Mat[3])
-
-                            print("######################################################################################################", end="\n")
-                            print("all folds done", end="\n")
-                            print("average f1 score: %.3f" %
-                                  (100*sum(acc)/len(acc)), end="\n")
-                            print("average confusion matrix (TP,FP,TN.FN): (%.2f, %.2f, %.2f, %.2f)" % (
-                                (sum(TPs)/len(TPs)), (sum(FPs)/len(FPs)), (sum(TNs)/len(TNs)), (sum(FNs)/len(FNs))))
-                            print("average false positive rate: %.3f%%" %
-                                  (100*sum(FPs)/(sum(FPs)+sum(TNs))))
-                            print("average false negative rate: %.3f%%" %
-                                  (100*sum(FNs)/(sum(FNs)+sum(TPs))))
-                            sys.stdout = oldStdOut
-                            print("Completed %d/%s" % (k, 5*5*6*3*5))
-                            sys.stdout = fiout
+    print("######################################################################################################", end="\n")
+    print("all folds done", end="\n")
+    print("average f1 score: %.3f" %
+          (100*sum(acc)/len(acc)), end="\n")
+    print("average confusion matrix (TP,FP,TN.FN): (%.2f, %.2f, %.2f, %.2f)" % (
+        (sum(TPs)/len(TPs)), (sum(FPs)/len(FPs)), (sum(TNs)/len(TNs)), (sum(FNs)/len(FNs))))
+    print("average false positive rate: %.3f%%" %
+          (100*sum(FPs)/(sum(FPs)+sum(TNs))))
+    print("average false negative rate: %.3f%%" %
+          (100*sum(FNs)/(sum(FNs)+sum(TPs))))
+    sys.stdout = oldStdOut
+    print("Completed %d/%s" % (5*5*6*3*5))
+    sys.stdout = fiout
 
 sys.stdout = oldStdOut
 fi.close()
